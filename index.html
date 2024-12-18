@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Mass Report Tool</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/1.6.2/axios.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1a1a1a;
+            color: #fff;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .banner {
+            text-align: center;
+            color: #b700ff;
+            font-family: monospace;
+            white-space: pre;
+            margin-bottom: 30px;
+            font-size: 12px;
+        }
+
+        .section {
+            background-color: #2a2a2a;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .title {
+            color: #b700ff;
+            font-size: 1.2em;
+            margin-bottom: 15px;
+        }
+
+        textarea {
+            width: 100%;
+            height: 100px;
+            background-color: #333;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+        }
+
+        .reason-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .reason-option {
+            padding: 10px;
+            background-color: #333;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .reason-option.selected {
+            background-color: #ff69b4;
+        }
+
+        button {
+            background-color: #b700ff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        button:disabled {
+            background-color: #666;
+            cursor: not-allowed;
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .stat-item {
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .log {
+            height: 200px;
+            overflow-y: auto;
+            background-color: #333;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+            border-radius: 2px;
+        }
+
+        .log-success {
+            color: #4CAF50;
+        }
+
+        .log-error {
+            color: #f44336;
+        }
+
+        input {
+            width: 100%;
+            margin-bottom: 10px;
+            padding: 8px;
+            background: #333;
+            border: 1px solid #444;
+            color: #fff;
+            border-radius: 4px;
+        }
+
+        .config-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="banner" id="banner">
+██████╗ ██████╗  ██████╗  ██████╗ █████╗     ██████╗  ██████╗ ██╗  ██╗
+██╔══██╗██╔══██╗██╔═══██╗██╔════╝██╔══██╗    ██╔══██╗██╔════╝ ██║ ██╔╝
+██████╔╝██████╔╝██║   ██║██║     ███████║    ██████╔╝██║  ███╗█████╔╝ 
+██╔══██╗██╔══██╗██║   ██║██║     ██╔══██║    ██╔══██╗██║   ██║██╔═██╗ 
+██████╔╝██║  ██║╚██████╔╝╚██████╗██║  ██║    ██████╔╝╚██████╔╝██║  ██╗
+╚═════╝ ╚═╝  ╚═╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝    ╚═════╝  ╚═════╝ ╚═╝  ╚═╝
+                                                                      
+        </div>
+
+        <div class="section">
+            <div class="title">Configuração de Tokens</div>
+            <textarea id="tokens" placeholder="Cole seus tokens aqui (um por linha)"></textarea>
+            <button onclick="validateTokens()">Validar Tokens</button>
+        </div>
+
+        <div class="section">
+            <div class="title">Motivo do Report</div>
+            <div class="reason-list" id="reasonList"></div>
+        </div>
+
+        <div class="section">
+            <div class="title">Configurações do Alvo</div>
+            <div class="config-grid">
+                <input type="text" id="serverId" placeholder="ID do Servidor">
+                <input type="text" id="channelId" placeholder="ID do Canal">
+                <input type="text" id="messageId" placeholder="ID da Mensagem">
+                <input type="number" id="delay" placeholder="Delay (ms)" value="1000">
+            </div>
+            <button id="startButton" onclick="startReporting()" disabled>Iniciar Mass Report</button>
+        </div>
+
+        <div class="section">
+            <div class="title">Estatísticas</div>
+            <div class="stats">
+                <div class="stat-item">
+                    Reports Enviados: <span id="successCount">0</span>
+                </div>
+                <div class="stat-item">
+                    Reports Falhos: <span id="failCount">0</span>
+                </div>
+                <div class="stat-item">
+                    Tokens Válidos: <span id="validTokenCount">0</span>
+                </div>
+                <div class="stat-item">
+                    Tempo Decorrido: <span id="elapsedTime">0s</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="title">Log de Atividades</div>
+            <div class="log" id="logContainer"></div>
+        </div>
+    </div>
+
+    <script>
+        class DiscordReporter {
+            constructor() {
+                this.tokens = [];
+                this.validTokens = [];
+                this.selectedReason = null;
+                this.successCount = 0;
+                this.failCount = 0;
+                this.startTime = null;
+                this.isRunning = false;
+                this.reportReasons = {
+                    1: { id: 0, label: 'Conteúdo Ilegal' },
+                    2: { id: 1, label: 'Assédio' },
+                    3: { id: 2, label: 'Spam ou Links Maliciosos' },
+                    4: { id: 3, label: 'Auto-mutilação' },
+                    5: { id: 4, label: 'NSFW' }
+                };
+                this.initializeReasonList();
+            }
+
+            initializeReasonList() {
+                const reasonList = document.getElementById('reasonList');
+                Object.entries(this.reportReasons).forEach(([key, value]) => {
+                    const option = document.createElement('div');
+                    option.className = 'reason-option';
+                    option.dataset.reason = value.id;
+                    option.textContent = value.label;
+                    option.onclick = () => this.selectReason(option, value.id);
+                    reasonList.appendChild(option);
+                });
+            }
+
+            selectReason(element, reasonId) {
+                document.querySelectorAll('.reason-option').forEach(opt => 
+                    opt.classList.remove('selected'));
+                element.classList.add('selected');
+                this.selectedReason = reasonId;
+            }
+
+            async validateToken(token) {
+                try {
+                    const response = await axios.get('https://discord.com/api/v9/users/@me', {
+                        headers: {
+                            'Authorization': token,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    this.log(`Token Válido: ${response.data.username}`, true);
+                    return true;
+                } catch (error) {
+                    this.log(`Token Inválido: ${token.substring(0, 20)}...`, false);
+                    return false;
+                }
+            }
+
+            async validateAllTokens() {
+                const tokenList = document.getElementById('tokens').value
+                    .split(/[\n,\s]+/)
+                    .map(token => token.trim())
+                    .filter(token => token.length > 0);
+
+                this.tokens = tokenList;
+                this.log(`Validando ${this.tokens.length} tokens...`, true);
+
+                const validationPromises = this.tokens.map(token => this.validateToken(token));
+                const validationResults = await Promise.all(validationPromises);
+                
+                this.validTokens = this.tokens.filter((_, index) => validationResults[index]);
+                document.getElementById('validTokenCount').textContent = this.validTokens.length;
+                
+                document.getElementById('startButton').disabled = this.validTokens.length === 0;
+                return this.validTokens.length > 0;
+            }
+
+            async sendReport(token, guildId, channelId, messageId, reason) {
+                const headers = {
+                    'Authorization': token,
+                    'Content-Type': 'application/json',
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                };
+
+                const payload = {
+                    channel_id: channelId,
+                    guild_id: guildId,
+                    message_id: messageId,
+                    reason: reason
+                };
+
+                try {
+                    const response = await axios.post('https://discord.com/api/v9/report', payload, { 
+                        headers,
+                        validateStatus: false
+                    });
+                    
+                    if (response.status === 201 || response.status === 200) {
+                        this.successCount++;
+                        document.getElementById('successCount').textContent = this.successCount;
+                        this.log(`Report enviado com sucesso usando token: ${token.substring(0, 15)}...`, true);
+                        return true;
+                    } else {
+                        throw new Error(`Status: ${response.status}`);
+                    }
+                } catch (error) {
+                    this.failCount++;
+                    document.getElementById('failCount').textContent = this.failCount;
+                    this.log(`Erro ao enviar report: ${error.message}`, false);
+                    return false;
+                }
+            }
+
+            log(message, success) {
+                const logContainer = document.getElementById('logContainer');
+                const entry = document.createElement('div');
+                entry.className = `log-entry ${success ? 'log-success' : 'log-error'}`;
+                entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+                logContainer.appendChild(entry);
+                logContainer.scrollTop = logContainer.scrollHeight;
+            }
+
+            async start() {
+                if (this.isRunning) return;
+                
+                const guildId = document.getElementById('serverId').value;
+                const channelId = document.getElementById('channelId').value;
+                const messageId = document.getElementById('messageId').value;
+                const delay = parseInt(document.getElementById('delay').value) || 1000;
+                
+                if (!guildId || !channelId || !messageId || this.selectedReason === null) {
+                    this.log('Preencha todos os campos necessários', false);
+                    return;
+                }
+
+                this.isRunning = true;
+                this.startTime = new Date();
+                this.updateTimer();
+                
+                while (this.isRunning) {
+                    for (const token of this.validTokens) {
+                        if (!this.isRunning) break;
+                        
+                        await this.sendReport(
+                            token,
+                            guildId,
+                            channelId,
+                            messageId,
+                            this.selectedReason
+                        );
+                        
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    }
+                }
+            }
+
+            stop() {
+                this.isRunning = false;
+            }
+
+            updateTimer() {
+                if (!this.startTime || !this.isRunning) return;
+                
+                const now = new Date();
+                const diff = Math.abs(now - this.startTime);
+                const seconds = Math.floor(diff / 1000);
+                const minutes = Math.floor(seconds / 60);
+                const hours = Math.floor(minutes / 60);
+                
+                const timeStr = `${hours}h ${minutes % 60}m ${seconds % 60}s`;
+                document.getElementById('elapsedTime').textContent = timeStr;
+                
+                if (this.isRunning) {
+                    setTimeout(() => this.updateTimer(), 1000);
+                }
+            }
+        }
+
+        const reporter = new DiscordReporter();
+
+        async function validateTokens() {
+            await reporter.validateAllTokens();
+        }
+
+        function startReporting() {
+            const button = document.getElementById('startButton');
+            if (button.textContent === 'Iniciar Mass Report') {
+                button.textContent = 'Parar Mass Report';
+                reporter.start();
+            } else {
+                button.textContent = 'Iniciar Mass Report';
+                reporter.stop();
+            }
+        }
+    </script>
+</body>
+</html>
